@@ -19,7 +19,7 @@ async function main() {
       role: 'ADMIN',
     },
   });
-  console.log(`✅ Admin ready: ${admin.email} / ${adminPassword}`);
+  console.log(`Admin ready: ${admin.email} / ${adminPassword}`);
 
   const categoryNames = ['Apartment', 'House', 'Studio', 'Duplex', 'Room Share'];
   for (const name of categoryNames) {
@@ -29,7 +29,7 @@ async function main() {
       create: { name },
     });
   }
-  console.log(`✅ ${categoryNames.length} categories seeded`);
+  console.log(`${categoryNames.length} categories seeded`);
 
   // Sample landlord + property for quick manual testing
   const landlordPassword = await bcrypt.hash('landlord123', 10);
@@ -64,7 +64,7 @@ async function main() {
       landlordId: landlord.id,
     },
   });
-  console.log('✅ Sample landlord + property seeded (landlord@rentnest.com / landlord123)');
+  console.log('Sample landlord + property seeded (landlord@rentnest.com / landlord123)');
 
   const tenantPassword = await bcrypt.hash('tenant123', 10);
   await prisma.user.upsert({
@@ -77,7 +77,7 @@ async function main() {
       role: 'TENANT',
     },
   });
-  console.log('✅ Sample tenant seeded (tenant@rentnest.com / tenant123)');
+  console.log('Sample tenant seeded (tenant@rentnest.com / tenant123)');
 }
 
 main()
