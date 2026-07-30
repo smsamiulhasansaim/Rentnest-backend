@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import {
+  getMyProperties,
   createProperty,
   updateProperty,
   deleteProperty,
@@ -19,6 +20,7 @@ const router = Router();
 
 router.use(authenticate, authorize('LANDLORD'));
 
+router.get('/properties', getMyProperties);
 router.post('/properties', validate(createPropertySchema), createProperty);
 router.put('/properties/:id', validate(updatePropertySchema), updateProperty);
 router.delete('/properties/:id', deleteProperty);

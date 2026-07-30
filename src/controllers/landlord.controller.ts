@@ -165,3 +165,26 @@ export const completeRental = asyncHandler(async (req: Request, res: Response) =
     data: updated,
   });
 });
+
+// Get all properties for the logged-in landlord
+export const getMyProperties = asyncHandler(async (req: Request, res: Response) => {
+  const landlordId = req.user!.id;
+
+  const properties = await prisma.property.findMany({
+    where: { landlordId },
+    include: {
+      category: true,
+      reviews: {
+        include: { tenant: { select: { id: true, name: true } } }
+      }
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Properties fetched successfully',
+    errorDetails: null,
+    data: properties,
+  });
+});
