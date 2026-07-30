@@ -4,7 +4,6 @@ import stripe from '../config/stripe';
 import asyncHandler from '../utils/asyncHandler';
 import AppError from '../utils/AppError';
 
-// Create a Stripe Checkout session for an APPROVED rental request
 export const createPayment = asyncHandler(async (req: Request, res: Response) => {
   const tenantId = req.user!.id;
   const { rentalRequestId } = req.body;
@@ -46,8 +45,8 @@ export const createPayment = asyncHandler(async (req: Request, res: Response) =>
         quantity: 1,
       },
     ],
-    success_url: `${process.env.CLIENT_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${process.env.CLIENT_URL}/payment/cancel`,
+    success_url: `${process.env.CLIENT_URL}/tenant/payments/success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${process.env.CLIENT_URL}/tenant/payments/cancel`,
     metadata: {
       rentalRequestId: rentalRequest.id,
       tenantId,
@@ -73,7 +72,6 @@ export const createPayment = asyncHandler(async (req: Request, res: Response) =>
   });
 });
 
-// Confirm payment - called from client redirect or webhook
 export const confirmPayment = asyncHandler(async (req: Request, res: Response) => {
   const { sessionId } = req.body;
 
@@ -83,7 +81,11 @@ export const confirmPayment = asyncHandler(async (req: Request, res: Response) =
 
   const session = await stripe.checkout.sessions.retrieve(sessionId);
 
-  const payment = await prisma.payment.findUnique({ where: { transactionId: sessionId } });
+  const payment = await prisma.payment.findUnique({ 
+    where: { transactionId: sessionId },
+    include: { rentalRequest: true }
+  });
+  
   if (!payment) throw new AppError('Payment record not found.', 404);
 
   if (session.payment_status === 'paid') {
@@ -123,7 +125,20 @@ export const getMyPayments = asyncHandler(async (req: Request, res: Response) =>
 
   const payments = await prisma.payment.findMany({
     where: { tenantId },
-    include: { rentalRequest: { include: { property: true } } },
+    include: { 
+      rentalRequest: { 
+        include: { 
+          property: {
+            select: {
+              id: true,
+              title: true,
+              price: true,
+              city: true
+            }
+          } 
+        } 
+      } 
+    },
     orderBy: { createdAt: 'desc' },
   });
 
@@ -138,7 +153,20 @@ export const getMyPayments = asyncHandler(async (req: Request, res: Response) =>
 export const getPaymentById = asyncHandler(async (req: Request, res: Response) => {
   const payment = await prisma.payment.findUnique({
     where: { id: req.params.id },
-    include: { rentalRequest: { include: { property: true } } },
+    include: { 
+      rentalRequest: { 
+        include: { 
+          property: {
+            select: {
+              id: true,
+              title: true,
+              price: true,
+              city: true
+            }
+          } 
+        } 
+      } 
+    },
   });
 
   if (!payment) throw new AppError('Payment not found.', 404);
@@ -154,7 +182,7 @@ export const getPaymentById = asyncHandler(async (req: Request, res: Response) =
   });
 });
 
-// Stripe webhook - raw body required (configured in index.ts)
+// Stripe webhook - raw body required
 export const stripeWebhook = asyncHandler(async (req: Request, res: Response) => {
   const sig = req.headers['stripe-signature'] as string;
   let event;
@@ -166,6 +194,7 @@ export const stripeWebhook = asyncHandler(async (req: Request, res: Response) =>
       process.env.STRIPE_WEBHOOK_SECRET as string
     );
   } catch (err) {
+    console.error('Webhook signature verification failed:', err);
     return res.status(400).json({
       success: false,
       message: 'Webhook signature verification failed',
@@ -173,18 +202,34 @@ export const stripeWebhook = asyncHandler(async (req: Request, res: Response) =>
     });
   }
 
+  console.log('Webhook event type:', event.type);
+
   if (event.type === 'checkout.session.completed') {
-    const session = event.data.object as { id: string };
-    const payment = await prisma.payment.findUnique({ where: { transactionId: session.id } });
-    if (payment) {
-      await prisma.payment.update({
-        where: { transactionId: session.id },
-        data: { status: 'COMPLETED', paidAt: new Date() },
+    const session = event.data.object as any;
+    const rentalRequestId = session.metadata?.rentalRequestId;
+    
+    if (rentalRequestId) {
+      const payment = await prisma.payment.findUnique({ 
+        where: { transactionId: session.id } 
       });
-      await prisma.rentalRequest.update({
-        where: { id: payment.rentalRequestId },
-        data: { status: 'ACTIVE' },
-      });
+      
+      if (payment) {
+        await prisma.payment.update({
+          where: { transactionId: session.id },
+          data: { status: 'COMPLETED', paidAt: new Date() },
+        });
+        
+        await prisma.rentalRequest.update({
+          where: { id: payment.rentalRequestId },
+          data: { status: 'ACTIVE' },
+        });
+        
+        console.log(`Payment completed for rental request ${payment.rentalRequestId}`);
+      } else {
+        console.log(`Payment record not found for session ${session.id}`);
+      }
+    } else {
+      console.log('No rentalRequestId in metadata');
     }
   }
 
