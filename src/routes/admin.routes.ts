@@ -9,6 +9,7 @@ import {
   createCategory,
   updateCategory,
   deleteCategory,
+  deletePropertyAdmin,
 } from '../controllers/admin.controller';
 import { authenticate, authorize } from '../middleware/auth';
 import validate from '../middleware/validate';
@@ -27,6 +28,7 @@ router.patch('/users/:id', updateUserStatus);
 
 // Properties
 router.get('/properties', getAllPropertiesAdmin);
+router.delete('/properties/:id', deletePropertyAdmin);
 
 // Rentals
 router.get('/rentals', getAllRentalsAdmin);

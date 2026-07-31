@@ -240,3 +240,64 @@ export const deleteCategory = asyncHandler(async (req: Request, res: Response) =
     data: null,
   });
 });
+
+// DELETE PROPERTY (ADMIN FORCE)
+export const deletePropertyAdmin = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  const property = await prisma.property.findUnique({
+    where: { id },
+    include: {
+      rentalRequests: true,
+      reviews: true,
+    },
+  });
+
+  if (!property) {
+    throw new AppError('Property not found.', 404);
+  }
+
+  // Admin can delete ANY property regardless of status
+  // Force delete - remove all related data
+
+  await prisma.$transaction(async (tx) => {
+    // Delete reviews
+    if (property.reviews.length > 0) {
+      await tx.review.deleteMany({
+        where: { propertyId: id },
+      });
+    }
+
+    // Get rental requests
+    const rentalRequests = await tx.rentalRequest.findMany({
+      where: { propertyId: id },
+      select: { id: true },
+    });
+
+    if (rentalRequests.length > 0) {
+      const rentalIds = rentalRequests.map(r => r.id);
+
+      // Delete payments
+      await tx.payment.deleteMany({
+        where: { rentalRequestId: { in: rentalIds } },
+      });
+
+      // Delete rental requests
+      await tx.rentalRequest.deleteMany({
+        where: { propertyId: id },
+      });
+    }
+
+    // Delete property
+    await tx.property.delete({
+      where: { id },
+    });
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Property deleted successfully by admin',
+    errorDetails: null,
+    data: null,
+  });
+});
