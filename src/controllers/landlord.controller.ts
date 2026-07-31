@@ -565,7 +565,10 @@ export const getDashboardStats = asyncHandler(async (req: Request, res: Response
   // Rental stats
   const allRentals = await prisma.rentalRequest.findMany({
     where: { property: { landlordId } },
-    include: { payment: true }
+    include: {
+      payment: true,
+      property: { select: { price: true } }
+    }
   });
 
   const pendingRequests = allRentals.filter(r => r.status === 'PENDING').length;
@@ -576,7 +579,7 @@ export const getDashboardStats = asyncHandler(async (req: Request, res: Response
   // Calculate earnings
   const totalEarnings = allRentals
     .filter(r => r.status === 'COMPLETED' && r.payment?.status === 'COMPLETED')
-    .reduce((sum, r) => sum + Number(r.property?.price || 0), 0);
+    .reduce((sum, r) => sum + Number(r.property?.price ?? 0), 0);
 
   // Recent activity
   const recentRentals = await prisma.rentalRequest.findMany({
