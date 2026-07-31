@@ -63,13 +63,45 @@ export const updateProperty = asyncHandler(async (req: Request, res: Response) =
 });
 
 export const deleteProperty = asyncHandler(async (req: Request, res: Response) => {
-  await ensureOwnership(req.params.id, req.user!.id);
+  const propertyId = req.params.id;
+  const landlordId = req.user!.id;
 
-  await prisma.property.delete({ where: { id: req.params.id } });
+  // Check ownership
+  const property = await prisma.property.findUnique({
+    where: { id: propertyId },
+    include: { rentalRequests: true }
+  });
+
+  if (!property) {
+    throw new AppError('Property not found.', 404);
+  }
+
+  if (property.landlordId !== landlordId) {
+    throw new AppError('You do not own this property.', 403);
+  }
+
+  // Check if property has active rental requests
+  const hasActiveRentals = property.rentalRequests.some(
+    (r: any) => r.status === 'ACTIVE' || r.status === 'PENDING'
+  );
+
+  if (hasActiveRentals) {
+    throw new AppError('Cannot delete property with active or pending rental requests.', 400);
+  }
+
+  // Delete in transaction
+  await prisma.$transaction([
+    prisma.review.deleteMany({ where: { propertyId } }),
+    prisma.payment.deleteMany({ 
+      where: { rentalRequest: { propertyId } } 
+    }),
+    prisma.rentalRequest.deleteMany({ where: { propertyId } }),
+    prisma.property.delete({ where: { id: propertyId } })
+  ]);
 
   res.status(200).json({
     success: true,
-    message: 'Property removed successfully',
+    message: 'Property deleted successfully',
     errorDetails: null,
     data: null,
   });
