@@ -301,3 +301,64 @@ export const deletePropertyAdmin = asyncHandler(async (req: Request, res: Respon
     data: null,
   });
 });
+
+//  GET PROPERTY BY ID (ADMIN) 
+export const getPropertyByIdAdmin = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  const property = await prisma.property.findUnique({
+    where: { id },
+    include: {
+      landlord: { select: { id: true, name: true, email: true, phone: true } },
+      category: true,
+      reviews: {
+        include: { tenant: { select: { name: true } } },
+        orderBy: { createdAt: 'desc' },
+      },
+      rentalRequests: {
+        include: {
+          tenant: { select: { name: true, email: true } },
+          payment: { select: { amount: true, status: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      },
+      _count: { select: { reviews: true, rentalRequests: true } },
+    },
+  });
+
+  if (!property) {
+    throw new AppError('Property not found.', 404);
+  }
+
+  res.status(200).json({
+    success: true,
+    message: 'Property fetched successfully',
+    errorDetails: null,
+    data: property,
+  });
+});
+
+//  GET RENTAL BY ID (ADMIN) 
+export const getRentalByIdAdmin = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  const rental = await prisma.rentalRequest.findUnique({
+    where: { id },
+    include: {
+      tenant: { select: { id: true, name: true, email: true } },
+      property: { select: { id: true, title: true, city: true, price: true } },
+      payment: true,
+    },
+  });
+
+  if (!rental) {
+    throw new AppError('Rental request not found.', 404);
+  }
+
+  res.status(200).json({
+    success: true,
+    message: 'Rental request fetched successfully',
+    errorDetails: null,
+    data: rental,
+  });
+});

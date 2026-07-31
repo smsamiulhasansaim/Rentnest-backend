@@ -4,12 +4,14 @@ import {
   getAllUsers,
   updateUserStatus,
   getAllPropertiesAdmin,
+  getPropertyByIdAdmin,
+  deletePropertyAdmin,
   getAllRentalsAdmin,
+  getRentalByIdAdmin,
   getAllCategories,
   createCategory,
   updateCategory,
   deleteCategory,
-  deletePropertyAdmin,
 } from '../controllers/admin.controller';
 import { authenticate, authorize } from '../middleware/auth';
 import validate from '../middleware/validate';
@@ -28,11 +30,12 @@ router.patch('/users/:id', updateUserStatus);
 
 // Properties
 router.get('/properties', getAllPropertiesAdmin);
+router.get('/properties/:id', getPropertyByIdAdmin);
 router.delete('/properties/:id', deletePropertyAdmin);
 
 // Rentals
 router.get('/rentals', getAllRentalsAdmin);
-
+router.get('/rentals/:id', getRentalByIdAdmin);
 // Categories
 router.get('/categories', getAllCategories);
 router.post('/categories', validate(createCategorySchema), createCategory);
